@@ -15,6 +15,12 @@
 #
 # http://www.raspberrypi-spy.co.uk/
 #
+#  Added support for BMP280 and changed key to api_key in values
+#  Also added a lot of print for troubleshooting, all of which are commented out now
+# Author : Pengatom
+# Date	 : April 8th 2016
+#
+# http://blog.pengatom.com/
 #--------------------------------------
 import smbus
 import time
@@ -24,6 +30,7 @@ import urllib            # URL functions
 import urllib2           # URL functions
 
 import bmp180            # Sensor library
+import bmp280
 import RPi.GPIO as GPIO  # GPIO library
 
 ################# Default Constants #################
@@ -32,10 +39,10 @@ DEVICE        = 0x77 # Default device I2C address
 SMBUSID       = 1    # Rev 2 Pi uses 1, Rev 1 uses 0
 LEDGPIO       = 17   # GPIO for LED
 SWITCHGPIO    = 22   # GPIO for switch
-INTERVAL      = 1    # Delay between each reading (mins)
+INTERVAL      = 10   # Delay between each reading (mins)
 AUTOSHUTDOWN  = 1    # Set to 1 to shutdown on switch
 THINGSPEAKKEY = 'ABCDEFGH12345678'
-THINGSPEAKURL = 'https://api.thingspeak.com/update'
+THINGSPEAKURL = 'https://api.thingspeak.com/update' #https://54.88.155.198/update'#
 #####################################################
 
 def switchCallback(channel):
@@ -52,28 +59,40 @@ def sendData(url,key,field1,field2,temp,pres):
   Send event to internet site
   """
 
+  #values = {'key' : key,'field1' : temp,'field2' : pres}
   values = {'api_key' : key,'field1' : temp,'field2' : pres}
 
   postdata = urllib.urlencode(values)
+  #print postdata
   req = urllib2.Request(url, postdata)
+  #print req
 
   log = time.strftime("%d-%m-%Y,%H:%M:%S") + ","
   log = log + "{:.1f}C".format(temp) + ","
   log = log + "{:.2f}mBar".format(pres) + ","
 
+  #print log
+  #sys.exit()
   try:
     # Send data to Thingspeak
+    #print "test"
     response = urllib2.urlopen(req, None, 5)
+    #print response.code
     html_string = response.read()
+    #print html_string
     response.close()
     log = log + 'Update ' + html_string
+    #print log
 
   except urllib2.HTTPError, e:
     log = log + 'Server could not fulfill the request. Error code: ' + e.code
+    print log
   except urllib2.URLError, e:
     log = log + 'Failed to reach server. Reason: ' + e.reason
+    print log
   except:
     log = log + 'Unknown error'
+    print log
 
   print log
 
@@ -122,7 +141,8 @@ def main():
 
     while True:
       GPIO.output(LEDGPIO, True)
-      (temperature,pressure)=bmp180.readBmp180(DEVICE)
+      (temperature,pressure)=bmp280.main(DEVICE)
+      #print "{:.1f}".format(temperature), "{:.2f}".format(pressure)
       sendData(THINGSPEAKURL,THINGSPEAKKEY,'field1','field2',temperature,pressure)
       sys.stdout.flush()
 
